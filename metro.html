@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>专业节拍器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: #f5efe6;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 8px;
+      touch-action: manipulation;
+    }
+    .metronome-card {
+      max-width: 450px;
+      width: 100%;
+      background: #fffcf7;
+      border-radius: 48px 48px 36px 36px;
+      box-shadow: 0 25px 40px -10px rgba(0,0,0,0.25);
+      padding: 20px 18px 28px;
+      border: 1px solid #e2d7c0;
+    }
+    .dial-section {
+      background: #f0e5d5;
+      border-radius: 120px;
+      padding: 20px 12px 15px;
+      margin-bottom: 20px;
+      box-shadow: inset 0 5px 8px #b9aa8e;
+    }
+    .dial-outer {
+      background: #e9dbc4;
+      border-radius: 180px;
+      padding: 12px;
+    }
+    .dial-inner {
+      background: #fcf5e8;
+      border-radius: 160px;
+      padding: 15px;
+      border: 3px solid #c9b386;
+      box-shadow: inset 0 0 10px #baa077;
+      position: relative;
+    }
+    .meter-area {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      height: 140px;
+      margin-bottom: 10px;
+    }
+    .scale-line {
+      width: 260px;
+      height: 130px;
+      border-radius: 260px 260px 0 0;
+      border-bottom: 6px solid #846f4e;
+      border-left: 6px solid #846f4e;
+      border-right: 6px solid #846f4e;
+      margin: 0 auto;
+      position: relative;
+    }
+    .pointer-container {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 240px;
+      height: 130px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .pointer {
+      width: 6px;
+      height: 115px;
+      background: linear-gradient(145deg, #3b352c, #1f1b14);
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      margin-left: -3px;
+      transform-origin: bottom center;
+      transform: rotate(0deg);
+      border-radius: 40% 40% 8px 8px;
+      will-change: transform;
+    }
+    .pointer::after {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #8a7a5c, #4d3f2b);
+      border-radius: 50%;
+      border: 2px solid #b59d6b;
+    }
+    .pointer-knob {
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 24px;
+      background: #6b5c45;
+      border-radius: 50%;
+      border: 3px solid #d8c09b;
+      z-index: 6;
+    }
+    .speed-display-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 10px 0 15px;
+    }
+    .bpm-number {
+      background: #2c2419;
+      color: #ffdd99;
+      padding: 8px 20px;
+      border-radius: 40px;
+      font-size: 56px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      min-width: 140px;
+      text-align: center;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .term-display {
+      font-size: 24px;
+      font-weight: 600;
+      color: #8b6f42;
+      text-transform: uppercase;
+      margin-top: 5px;
+      letter-spacing: 1px;
+    }
+
+    /* 滚轮样式 */
+    .wheel-container {
+      width: 100%;
+      margin: 20px 0 10px;
+      position: relative;
+      padding: 4px;
+      background: linear-gradient(145deg, #d4c4a8, #b8a88a);
+      border-radius: 60px;
+      box-shadow: 
+        0 2px 4px rgba(255,255,255,0.3) inset,
+        0 4px 8px rgba(0,0,0,0.2);
+    }
+    .speed-wheel {
+      background: 
+        radial-gradient(ellipse at center top, rgba(255,255,255,0.1) 0%, transparent 60%),
+        linear-gradient(180deg, #8b7d66 0%, #6b5f4d 50%, #5a4f3f 100%);
+      width: 100%;
+      height: 90px;
+      border-radius: 56px;
+      user-select: none;
+      touch-action: pan-x;
+      cursor: grab;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      box-shadow:
+        inset 0 3px 6px rgba(0,0,0,0.4),
+        inset 0 -2px 4px rgba(255,255,255,0.1),
+        0 2px 4px rgba(0,0,0,0.3);
+      border: 2px solid #4a4033;
+    }
+    .speed-wheel:active { cursor: grabbing; }
+    .speed-wheel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg '%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+      opacity: 0.4;
+      pointer-events: none;
+      border-radius: 56px;
+    }
+    .tick-marks {
+      position: absolute;
+      top: 8px;
+      left: 0;
+      right: 0;
+      height: 20px;
+      pointer-events: none;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 0 25px;
+      z-index: 1;
+    }
+    .tick {
+      width: 1px;
+      background: rgba(252, 242, 218, 0.6);
+      box-shadow: 0 1px 1px rgba(0,0,0,0.3);
+    }
+    .tick.major { height: 12px; width: 2px; background: rgba(252, 242, 218, 0.9); }
+    .tick.minor { height: 6px; }
+    .wheel-indicator {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 12px solid #e8d5a3;
+      z-index: 10;
+      pointer-events: none;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
+    }
+    .wheel-indicator::after {
+      content: '';
+      position: absolute;
+      top: -14px;
+      left: -4px;
+      width: 8px;
+      height: 8px;
+      background: radial-gradient(circle, #f0e0b0, #c9b386);
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .rivet {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: radial-gradient(circle at 30% 30%, #d4c4a8, #8b7d66);
+      border-radius: 50%;
+      box-shadow: 
+        inset 0 1px 2px rgba(255,255,255,0.4),
+        0 1px 2px rgba(0,0,0,0.4);
+      z-index: 5;
+    }
+    .rivet.tl { top: 8px; left: 12px; }
+    .rivet.tr { top: 8px; right: 12px; }
+    .rivet.bl { bottom: 8px; left: 12px; }
+    .rivet.br { bottom: 8px; right: 12px; }
+    .wheel-markers {
+      display: flex;
+      gap: 40px;
+      padding-left: 20px;
+      white-space: nowrap;
+      will-change: transform;
+      margin-top: 15px;
+    }
+    .wheel-markers span {
+      font-family: 'Courier New', 'Monaco', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fcf2da;
+      width: 50px;
+      text-align: center;
+      text-shadow: 
+        0 -1px 1px rgba(0,0,0,0.5),
+        0 1px 1px rgba(255,255,255,0.2);
+      opacity: 0.9;
+    }
+
+    /* 节奏按钮 */
+    .rhythm-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .rhythm-item {
+      background: #e7dccb;
+      border-radius: 50px;
+      padding: 14px 0;
+      text-align: center;
+      box-shadow: 0 5px 0 #aa9472;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70px;
+      transition: all 0.1s;
+    }
+    .rhythm-item.active {
+      background: #b59363;
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 #6f552f;
+    }
+    .rhythm-item.active .note-head { fill: #fff; }
+    .rhythm-item.active .note-stem { stroke: #fff; }
+    .rhythm-item.active .note-beam { fill: #fff; }
+    .rhythm-item.active .note-dot { fill: #fff; }
+    .note-symbol { width: 90%; height: 40px; display: flex; align-items: center; justify-content: center; }
+    .note-symbol svg { width: 100%; height: 100%; }
+    .note-head { fill: #3d3220; }
+    .note-stem { stroke: #3d3220; stroke-width: 2; }
+    .note-beam { fill: #3d3220; }
+    .note-dot { fill: #3d3220; }
+    .note-name { display: none; }
+    
+    .sound-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0;
+      background: #dbcfb8;
+      padding: 12px 20px;
+      border-radius: 50px;
+    }
+    .sound-picker { display: flex; gap: 10px; flex: 2; }
+    .sound-option {
+      background: #f7ebd4;
+      border: none;
+      width: 48px;
+      height: 48px;
+      border-radius: 48px;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+      color: #5b461f;
+      box-shadow: 0 4px 0 #856e48;
+      cursor: pointer;
+      transition: all 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      position: relative;
+    }
+    .sound-option.active { 
+      background: #caa66b; 
+      color: white; 
+      box-shadow: 0 2px 0 #6c4f28; 
+      transform: translateY(2px); 
+    }
+    .start-stop {
+      background: #56492e;
+      border: none;
+      color: white;
+      font-size: 22px;
+      width: 75px;
+      height: 60px;
+      border-radius: 50px;
+      box-shadow: 0 8px 0 #2f2616;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .start-stop:active { 
+      transform: translateY(4px); 
+      box-shadow: 0 4px 0 #2f2616; 
+    }
+  </style>
+</head>
+<body>
+  <div class="metronome-card">
+    <div class="dial-section">
+      <div class="dial-outer">
+        <div class="dial-inner">
+          <div class="meter-area">
+            <div class="scale-line"></div>
+            <div class="pointer-container">
+              <div class="pointer" id="pointer"></div>
+              <div class="pointer-knob"></div>
+            </div>
+          </div>
+          <div class="speed-display-area">
+            <div class="bpm-number" id="bpmDisplay">80</div>
+            <div class="term-display" id="termDisplay">Andante</div>
+          </div>
+          
+          <div class="wheel-container">
+            <div class="speed-wheel" id="speedWheel">
+              <div class="rivet tl"></div>
+              <div class="rivet tr"></div>
+              <div class="rivet bl"></div>
+              <div class="rivet br"></div>
+              
+              <div class="tick-marks">
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div><div class="tick minor"></div>
+                <div class="tick minor"></div><div class="tick minor"></div>
+                <div class="tick major"></div>
+              </div>
+              
+              <div class="wheel-indicator"></div>
+              
+              <div class="wheel-markers" id="wheelMarkers">
+                <span>40</span><span>60</span><span>80</span><span>100</span>
+                <span>120</span><span>140</span><span>160</span><span>180</span><span>200</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rhythm-grid">
+      <button class="rhythm-item active" data-rhythm="quarter">
+        <div class="note-symbol">
+          <svg viewBox="0 0 30 40"><ellipse cx="12" cy="28" rx="5.5" ry="4" class="note-head" transform="rotate(-15 12 28)"/><line x1="17" y1="26" x2="17" y2="8" class="note-stem"/></svg>
+        </div>
+        <span class="note-name">四分</span>
+      </button>
+      <button class="rhythm-item" data-rhythm="eighth2">
+        <div class="note-symbol">
+          <svg viewBox="0 0 45 40"><ellipse cx="10" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 10 28)"/><line x1="15" y1="26" x2="15" y2="8" class="note-stem"/><ellipse cx="32" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 32 28)"/><line x1="37" y1="26" x2="37" y2="8" class="note-stem"/><rect x="15" y="8" width="22" height="3" class="note-beam"/></svg>
+        </div>
+        <span class="note-name">两个八分</span>
+      </button>
+      <button class="rhythm-item" data-rhythm="sixteenth4">
+        <div class="note-symbol">
+          <svg viewBox="0 0 70 40"><ellipse cx="8" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 8 28)"/><line x1="13" y1="26" x2="13" y2="6" class="note-stem"/><ellipse cx="26" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 26 28)"/><line x1="31" y1="26" x2="31" y2="6" class="note-stem"/><ellipse cx="44" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 44 28)"/><line x1="49" y1="26" x2="49" y2="6" class="note-stem"/><ellipse cx="62" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 62 28)"/><line x1="67" y1="26" x2="67" y2="6" class="note-stem"/><rect x="13" y="6" width="54" height="2.5" class="note-beam"/><rect x="13" y="9.5" width="54" height="2.5" class="note-beam"/></svg>
+        </div>
+        <span class="note-name">四个十六</span>
+      </button>
+      <button class="rhythm-item" data-rhythm="pre16">
+        <div class="note-symbol">
+          <svg viewBox="0 0 55 40"><ellipse cx="10" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 10 28)"/><line x1="15" y1="26" x2="15" y2="6" class="note-stem"/><ellipse cx="28" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 28 28)"/><line x1="33" y1="26" x2="33" y2="6" class="note-stem"/><ellipse cx="46" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 46 28)"/><line x1="51" y1="26" x2="51" y2="6" class="note-stem"/><rect x="15" y="6" width="36" height="2.5" class="note-beam"/><rect x="33" y="9.5" width="18" height="2.5" class="note-beam"/></svg>
+        </div>
+        <span class="note-name">前八后十六</span>
+      </button>
+      <button class="rhythm-item" data-rhythm="post16">
+        <div class="note-symbol">
+          <svg viewBox="0 0 55 40"><ellipse cx="10" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 10 28)"/><line x1="15" y1="26" x2="15" y2="6" class="note-stem"/><ellipse cx="28" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 28 28)"/><line x1="33" y1="26" x2="33" y2="6" class="note-stem"/><ellipse cx="46" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 46 28)"/><line x1="51" y1="26" x2="51" y2="6" class="note-stem"/><rect x="15" y="6" width="36" height="2.5" class="note-beam"/><rect x="15" y="9.5" width="18" height="2.5" class="note-beam"/></svg>
+        </div>
+        <span class="note-name">前十六后八</span>
+      </button>
+      
+      <!-- 小切分：十六分-八分-十六分，双符杠 -->
+      <button class="rhythm-item" data-rhythm="syncop">
+        <div class="note-symbol">
+          <svg viewBox="0 0 60 40">
+            <ellipse cx="10" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 10 28)"/>
+            <line x1="15" y1="26" x2="15" y2="6" class="note-stem"/>
+            
+            <ellipse cx="30" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 30 28)"/>
+            <line x1="35" y1="26" x2="35" y2="6" class="note-stem"/>
+            
+            <ellipse cx="50" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 50 28)"/>
+            <line x1="55" y1="26" x2="55" y2="6" class="note-stem"/>
+            
+            <!-- 主杠 -->
+            <rect x="15" y="6" width="40" height="2.5" class="note-beam"/>
+            <!-- 两侧第二杠（向内） -->
+            <rect x="15" y="9.5" width="8" height="2.5" class="note-beam"/>
+            <rect x="47" y="9.5" width="8" height="2.5" class="note-beam"/>
+          </svg>
+        </div>
+        <span class="note-name">切分音</span>
+      </button>
+      
+      <!-- 三连音：三个八分音符，带"3"标记 -->
+      <button class="rhythm-item" data-rhythm="triplet">
+        <div class="note-symbol">
+          <svg viewBox="0 0 60 40">
+            <!-- 三个八分音符符头 -->
+            <ellipse cx="10" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 10 28)"/>
+            <ellipse cx="30" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 30 28)"/>
+            <ellipse cx="50" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 50 28)"/>
+            <!-- 三条符干 -->
+            <line x1="15" y1="26" x2="15" y2="6" class="note-stem"/>
+            <line x1="35" y1="26" x2="35" y2="6" class="note-stem"/>
+            <line x1="55" y1="26" x2="55" y2="6" class="note-stem"/>
+            <!-- 贯穿符杠 -->
+            <rect x="15" y="6" width="40" height="3" class="note-beam"/>
+            <!-- 三连音标记"3" -->
+            <text x="30" y="4" font-family="Courier New, monospace" font-size="14" font-weight="bold" fill="#3d3220" text-anchor="middle">3</text>
+          </svg>
+        </div>
+        <span class="note-name">三连音</span>
+      </button>
+      
+      <button class="rhythm-item" data-rhythm="dottede">
+        <div class="note-symbol">
+          <svg viewBox="0 0 50 40"><ellipse cx="12" cy="28" rx="5" ry="4" class="note-head" transform="rotate(-15 12 28)"/><line x1="17" y1="26" x2="17" y2="6" class="note-stem"/><circle cx="22" cy="24" r="1.8" class="note-dot"/><ellipse cx="38" cy="28" rx="4.5" ry="3.5" class="note-head" transform="rotate(-15 38 28)"/><line x1="43" y1="26" x2="43" y2="6" class="note-stem"/><rect x="17" y="6" width="26" height="2.5" class="note-beam"/><rect x="43" y="9.5" width="3" height="2.5" class="note-beam"/></svg>
+        </div>
+        <span class="note-name">小附点</span>
+      </button>
+    </div>
+
+    <div class="sound-row">
+      <div class="sound-picker">
+        <button class="sound-option active" data-sound="wood" title="木鱼 Wood">■</button>
+        <button class="sound-option" data-sound="click" title="点击 Click">·</button>
+        <button class="sound-option" data-sound="beep" title="铃铛 Beep">○</button>
+        <button class="sound-option" data-sound="kick" title="鼓 Kick">●</button>
+        <button class="sound-option" data-sound="hat" title="镲 Hat">✕</button>
+      </div>
+      <button class="start-stop" id="startBtn">▶</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      let bpm = 80;
+      let isPlaying = false;
+      let currentRhythm = 'quarter';
+      let currentSound = 'wood';
+      let audioCtx = null;
+      let rafId = null;
+      let timerId = null;
+      let startTime = 0;
+      let nextNoteTime = 0;
+      let beatDuration = 0;
+      
+      const pointer = document.getElementById('pointer');
+      const bpmDisplay = document.getElementById('bpmDisplay');
+      const termDisplay = document.getElementById('termDisplay');
+      const wheelMarkers = document.getElementById('wheelMarkers');
+      const speedWheel = document.getElementById('speedWheel');
+      const startBtn = document.getElementById('startBtn');
+
+      // 修正后的标准速度术语表
+      const tempoNames = [
+        { name: 'Grave', min: 40 },      // 40-50: 庄板
+        { name: 'Largo', min: 50 },      // 50-66: 广板  
+        { name: 'Adagio', min: 66 },     // 66-76: 柔板
+        { name: 'Andante', min: 76 },    // 76-84: 行板 (修正：原92改为84)
+        { name: 'Moderato', min: 84 },   // 84-100: 中板 (修正：原92改为84)
+        { name: 'Allegretto', min: 100 },// 100-108: 小快板 (新增)
+        { name: 'Allegro', min: 108 },   // 108-168: 快板 (修正：原108改为108，保持)
+        { name: 'Vivace', min: 168 },    // 168-176: 急快板 (修正：原132改为168)
+        { name: 'Presto', min: 176 }     // 176-200: 急板 (修正：原168改为176)
+      ];
+
+      const PHYSICS = {
+        sensitivity: 3,
+        friction: 0.94,
+        minVelocity: 0.05,
+        bounce: 0.4,
+        bounds: { min: 40, max: 200 },
+        snapDuration: 150
+      };
+      
+      let wheelState = {
+        dragging: false,
+        startX: 0,
+        startBpm: 80,
+        lastX: 0,
+        lastTime: 0,
+        velocity: 0,
+        rafId: null
+      };
+
+      const patterns = {
+        quarter: [{ t: 0, accent: 1 }],
+        eighth2: [{ t: 0, accent: 1 }, { t: 0.5, accent: 0.6 }],
+        sixteenth4: [{ t: 0, accent: 1 }, { t: 0.25, accent: 0.6 }, { t: 0.5, accent: 0.6 }, { t: 0.75, accent: 0.6 }],
+        pre16: [{ t: 0, accent: 1 }, { t: 0.5, accent: 0.6 }, { t: 0.75, accent: 0.6 }],
+        post16: [{ t: 0, accent: 1 }, { t: 0.25, accent: 0.6 }, { t: 0.5, accent: 0.6 }],
+        syncop: [{ t: 0, accent: 1 }, { t: 0.25, accent: 0.8 }, { t: 0.75, accent: 0.6 }],
+        // 三连音：一拍内均匀三个音
+        triplet: [{ t: 0, accent: 1 }, { t: 0.333, accent: 0.7 }, { t: 0.667, accent: 0.6 }],
+        dottede: [{ t: 0, accent: 1 }, { t: 0.75, accent: 0.6 }]
+      };
+
+      const multipliers = {
+        quarter: 1, eighth2: 1, sixteenth4: 1, pre16: 1, 
+        post16: 1, syncop: 1, triplet: 1, dottede: 1
+      };
+
+      function getTempo(bpmVal) {
+        // 从后向前查找，找到第一个min小于等于当前bpm的术语
+        for (let i = tempoNames.length - 1; i >= 0; i--) {
+          if (bpmVal >= tempoNames[i].min) return tempoNames[i].name;
+        }
+        return 'Grave';
+      }
+
+      function updateBpmDisplay() {
+        const rounded = Math.round(bpm);
+        bpmDisplay.textContent = rounded;
+        termDisplay.textContent = getTempo(rounded);
+        
+        // 滚轮刻度定位：每20BPM一个主刻度，计算偏移使当前BPM居中
+        const itemWidth = 90;
+        const startOffset = 45;
+        const wheelCenter = speedWheel.offsetWidth / 2;
+        const index = (bpm - 40) / 20; // 40,60,80,100... 分别对应 index 0,1,2,3...
+        const targetPos = startOffset + index * itemWidth;
+        const offset = wheelCenter - targetPos;
+        
+        wheelMarkers.style.transform = `translateX(${offset}px)`;
+      }
+
+      function setBpm(newBpm, options = {}) {
+        newBpm = Math.max(PHYSICS.bounds.min, Math.min(PHYSICS.bounds.max, newBpm));
+        
+        if (!options.force && Math.abs(newBpm - bpm) < 0.001) return;
+        
+        if (isPlaying && audioCtx) {
+          const now = audioCtx.currentTime;
+          const elapsed = now - startTime;
+          const oldBeatDuration = beatDuration;
+          
+          const progress = (elapsed % oldBeatDuration) / oldBeatDuration;
+          bpm = newBpm;
+          beatDuration = 60 / bpm;
+          
+          const completedBeats = Math.floor(elapsed / oldBeatDuration);
+          const newElapsed = completedBeats * beatDuration + progress * beatDuration;
+          startTime = now - newElapsed;
+          
+          nextNoteTime = startTime + (completedBeats + 1) * beatDuration;
+        } else {
+          bpm = newBpm;
+          beatDuration = 60 / bpm;
+        }
+        
+        updateBpmDisplay();
+      }
+
+      function initAudio() {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      function playClick(accent, time) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        const freqs = {
+          wood: accent === 1 ? 900 : 700,
+          click: accent === 1 ? 4000 : 3200,
+          beep: accent === 1 ? 1000 : 800,
+          kick: accent === 1 ? 200 : 150,
+          hat: accent === 1 ? 8000 : 6000
+        };
+        
+        osc.frequency.value = freqs[currentSound] || 800;
+        osc.type = currentSound === 'hat' ? 'square' : 'triangle';
+        
+        const gains = {
+  wood: accent === 1 ? 1.0 : 0.6,
+  click: accent === 1 ? 0.9 : 0.5,
+  beep: accent === 1 ? 0.9 : 0.5,
+  kick: accent === 1 ? 1.2 : 0.8,
+  hat: accent === 1 ? 0.7 : 0.4
+};
+const vol = gains[currentSound] || 0.5;
+        gain.gain.setValueAtTime(vol, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(time);
+        osc.stop(time + 0.05);
+      }
+
+      function schedule() {
+        if (!isPlaying) return;
+        
+        while (nextNoteTime < audioCtx.currentTime + 0.1) {
+          const pattern = patterns[currentRhythm];
+          const currentBeatLen = beatDuration * (multipliers[currentRhythm] || 1);
+          
+          pattern.forEach(note => {
+            const noteTime = nextNoteTime + (note.t * currentBeatLen);
+            playClick(note.accent, noteTime);
+          });
+          
+          nextNoteTime += currentBeatLen;
+        }
+        
+        timerId = setTimeout(schedule, 25);
+      }
+
+      function updatePointer() {
+        if (!isPlaying) return;
+        
+        const now = audioCtx.currentTime;
+        const elapsed = now - startTime;
+        // 指针摆动：使用余弦函数模拟物理摆锤，25度摆幅
+        const angle = 25 * Math.cos(Math.PI * elapsed / beatDuration);
+        pointer.style.transform = `rotate(${angle}deg)`;
+        
+        rafId = requestAnimationFrame(updatePointer);
+      }
+
+      function start() {
+        if (isPlaying) return;
+        initAudio();
+        
+        isPlaying = true;
+        startBtn.textContent = '⏸';
+        beatDuration = 60 / bpm;
+        
+        const now = audioCtx.currentTime;
+        startTime = now;
+        nextNoteTime = now;
+        
+        schedule();
+        updatePointer();
+      }
+
+      function stop() {
+        isPlaying = false;
+        startBtn.textContent = '▶';
+        clearTimeout(timerId);
+        cancelAnimationFrame(rafId);
+        pointer.style.transition = 'transform 0.3s ease-out';
+        pointer.style.transform = 'rotate(0deg)';
+        setTimeout(() => {
+          pointer.style.transition = '';
+        }, 300);
+      }
+
+      function snapToInteger() {
+        const target = Math.round(bpm);
+        const start = bpm;
+        const startTime = performance.now();
+        
+        function animate() {
+          const elapsed = performance.now() - startTime;
+          const progress = Math.min(elapsed / PHYSICS.snapDuration, 1);
+          // 弹性缓出
+          const ease = progress === 1 ? 1 : 
+            1 - Math.pow(2, -10 * progress) * Math.sin((progress * 10 - 0.75) * (2 * Math.PI) / 3);
+          
+          const current = start + (target - start) * ease;
+          setBpm(current, { force: true });
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            if (navigator.vibrate) navigator.vibrate(3);
+          }
+        }
+        animate();
+      }
+
+      function inertiaLoop() {
+        if (wheelState.dragging || Math.abs(wheelState.velocity) < PHYSICS.minVelocity) {
+          snapToInteger();
+          return;
+        }
+        
+        wheelState.velocity *= PHYSICS.friction;
+        
+        // 边界反弹
+        if (bpm <= PHYSICS.bounds.min && wheelState.velocity > 0) {
+          wheelState.velocity *= -PHYSICS.bounce;
+        } else if (bpm >= PHYSICS.bounds.max && wheelState.velocity < 0) {
+          wheelState.velocity *= -PHYSICS.bounce;
+        }
+        
+        const dt = 16.67; // 约60fps
+        const deltaBpm = (wheelState.velocity * dt) / PHYSICS.sensitivity;
+        setBpm(bpm + deltaBpm);
+        
+        wheelState.rafId = requestAnimationFrame(inertiaLoop);
+      }
+
+      speedWheel.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (wheelState.rafId) {
+          cancelAnimationFrame(wheelState.rafId);
+          wheelState.rafId = null;
+        }
+        wheelState.velocity = 0;
+        wheelState.dragging = true;
+        
+        const touch = e.touches[0];
+        wheelState.startX = touch.clientX;
+        wheelState.startBpm = bpm;
+        wheelState.lastX = touch.clientX;
+        wheelState.lastTime = performance.now();
+        
+        speedWheel.style.cursor = 'grabbing';
+      }, { passive: false, capture: true });
+
+      speedWheel.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!wheelState.dragging) return;
+        
+        const touch = e.touches[0];
+        const deltaX = wheelState.startX - touch.clientX; // 左滑增加，右滑减少
+        
+        // 边界阻力
+        let resistance = 1;
+        if ((bpm <= PHYSICS.bounds.min && deltaX < 0) || 
+            (bpm >= PHYSICS.bounds.max && deltaX > 0)) {
+          resistance = 2.5;
+        }
+        
+        const newBpm = wheelState.startBpm + (deltaX / (PHYSICS.sensitivity * resistance));
+        setBpm(newBpm);
+        
+        // 计算速度
+        const now = performance.now();
+        const dt = now - wheelState.lastTime;
+        if (dt > 0 && dt < 50) {
+          const dx = wheelState.lastX - touch.clientX;
+          wheelState.velocity = dx / dt;
+        }
+        
+        wheelState.lastX = touch.clientX;
+        wheelState.lastTime = now;
+      }, { passive: false, capture: true });
+
+      speedWheel.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        wheelState.dragging = false;
+        speedWheel.style.cursor = 'grab';
+        
+        if (Math.abs(wheelState.velocity) > 0.3) {
+          inertiaLoop();
+        } else {
+          snapToInteger();
+        }
+      }, { passive: false, capture: true });
+
+      speedWheel.addEventListener('mousedown', (e) => {
+        if (wheelState.rafId) {
+          cancelAnimationFrame(wheelState.rafId);
+          wheelState.rafId = null;
+        }
+        wheelState.dragging = true;
+        wheelState.velocity = 0;
+        wheelState.startX = e.clientX;
+        wheelState.startBpm = bpm;
+        wheelState.lastX = e.clientX;
+        wheelState.lastTime = performance.now();
+        speedWheel.style.cursor = 'grabbing';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!wheelState.dragging) return;
+        e.preventDefault();
+        
+        const deltaX = wheelState.startX - e.clientX;
+        let resistance = 1;
+        if ((bpm <= 40 && deltaX < 0) || (bpm >= 200 && deltaX > 0)) resistance = 2.5;
+        
+        const newBpm = wheelState.startBpm + (deltaX / (PHYSICS.sensitivity * resistance));
+        setBpm(newBpm);
+        
+        const now = performance.now();
+        const dt = now - wheelState.lastTime;
+        if (dt > 0 && dt < 50) {
+          wheelState.velocity = (wheelState.lastX - e.clientX) / dt;
+        }
+        wheelState.lastX = e.clientX;
+        wheelState.lastTime = now;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (wheelState.dragging) {
+          wheelState.dragging = false;
+          speedWheel.style.cursor = 'grab';
+          if (Math.abs(wheelState.velocity) > 0.3) {
+            inertiaLoop();
+          } else {
+            snapToInteger();
+          }
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        updateBpmDisplay();
+      });
+
+      speedWheel.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (wheelState.dragging) return;
+        
+        const direction = e.deltaY > 0 ? -1 : 1;
+        setBpm(Math.round(bpm) + direction);
+      }, { passive: false });
+
+      speedWheel.addEventListener('click', (e) => {
+        if (Math.abs(wheelState.velocity) > 0.2 || wheelState.dragging) return;
+        
+        const rect = speedWheel.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        const targetBpm = 40 + ratio * 160;
+        
+        const startBpm = bpm;
+        const startTime = performance.now();
+        const duration = 250;
+        
+        function animate() {
+          const elapsed = performance.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3);
+          const current = startBpm + (targetBpm - startBpm) * ease;
+          setBpm(current);
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            snapToInteger();
+          }
+        }
+        animate();
+      });
+
+      document.querySelectorAll('.rhythm-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.rhythm-item').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentRhythm = btn.dataset.rhythm;
+        });
+      });
+
+      document.querySelectorAll('.sound-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.sound-option').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSound = btn.dataset.sound;
+        });
+      });
+
+      startBtn.addEventListener('click', () => {
+        if (isPlaying) stop(); else start();
+      });
+
+      updateBpmDisplay();
+    })();
+  </script>
+</body>
+</html>
